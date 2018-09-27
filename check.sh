@@ -3,7 +3,7 @@ export LC_ALL="en_US.UTF-8"
 
 echo check begin!
 
-checkDIR=/dbbackup/info.txt
+checkDIR=/tmp/info.txt
 
 DATE=`date +%Y%m%d_%H:%M`
 echo " " > $checkDIR
@@ -55,7 +55,7 @@ status=$(/etc/init.d/nginx status)
 port=$(netstat -anptul|grep nginx|grep LISTEN )
 echo $status >>$checkDIR;
 echo $port >>$checkDIR;
-else 
+else
 echo "The server doesn't have this service!" >>$checkDIR;
 fi;
 
@@ -66,7 +66,7 @@ status=$(/etc/init.d/mysql status)
 port=$(netstat -anptul|grep 3306|grep LISTEN )
 echo $status >>$checkDIR;
 echo $port >>$checkDIR;
-else 
+else
 echo "The server doesn't have this service!" >>$checkDIR;
 fi;
 
@@ -77,7 +77,7 @@ status=$(/etc/init.d/httpd status)
 port=$(netstat -anptul|grep http|grep LISTEN )
 echo $status >>$checkDIR;
 echo $port >>$checkDIR;
-else 
+else
 echo "The server doesn't have this service!" >>$checkDIR;
 fi;
 
@@ -86,7 +86,7 @@ if [ -w /etc/init.d/munin-node ];
 then
 status=$(/etc/init.d/munin-node status)
 echo $status >>$checkDIR;
-else 
+else
 echo "The server doesn't have this service!" >>$checkDIR;
 fi;
 
