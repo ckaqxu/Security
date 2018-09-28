@@ -200,7 +200,12 @@
 	Mangle提供的功能：
 		1、修改IP包头的TTL值
 		2、修改IP包头的DSCP值或对特定的数据包设置特征
-			iptables -t mangle -A OUTPUT -p tcp --dport -j DSCP --set-dscp 43
+            QOS的机制可以让我们在有限的带宽中，有效分配不同的带宽给不同的协议使用。
+                QOS的机制有两个不同的部分组成，其一为“数据包分类器”，其二为“带宽分配器”
+                    通过IP包内的DSCP值来分类
+                    使用Mangle机制为数据包标示识别码
+            如果想要改变本机进程所生成的数据包内的DSCP值，就必须将规则放置于OUTPUT链之中，或是POSTROUTING链都可以达到我们的目的。
+			iptables -t mangle -A OUTPUT -p tcp --dport 22 -j DSCP --set-dscp 43
 }
 
 三、Netfilter的匹配方式及处理方法
@@ -229,15 +234,15 @@
 	/lib/modules/2.6.32-573.12.1.el6.x86_64/kernel/net/ipv6/netfilter
 		1、TCP/UDP协议的匹配方式
 			TCP协议高级匹配
-				端口号
+				端口号（源端口、目标端口号）
 				TCP-Flags
-					fin-->连接终止信号
-					syn-->连接请求信号
-					reset-->立即终止连接
-					ack-->确认应答信号
+					位1---fin-->连接终止信号
+					位2---syn-->连接请求信号
+					位3---reset-->立即终止连接
+					位4---ack-->确认应答信号
 						iptables -A INPUT -p tcp --syn --dport 22 -m state --state NEW -j ACCEPT
 						iptables -A INPUT -p tcp --tcp-flags ALL SYN,FIN -j DROP #检查所有TCP-Flags，但只有syn和fin两个标记同时为1时数据包才会筛选出来
-						iptables -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP
+						iptables -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP #只检查syn和fin两个标记，而且这两个标记必须同时为1
 			UDP协议高级匹配
 				--sport
 				--dport
@@ -258,13 +263,16 @@
 			--dst-range
 				iptables -A INPUT -m iprange --src-range 192.168.0.2-192.168.0.61 -j DROP
 		7、TTL匹配（模块名称ipt_ttl.ko）
+            Windows系统的默认值为128，Linux系统默认值是64
 			-m ttl --ttl-eq 64
 			-m ttl --ttl-lt 64
 			-m ttl --ttl-gt 64
 				iptables -A INPUT -m ttl --ttl-eq 64 -j REJECT
 		8、数据包状态匹配（模块名称xt_state.ko）
-			NEW,ESTABLISHED,RELATED,INVALID
+            TCP的连接状态：ESTABLISHED、SYN_SENT、SYN_RECV、FIN_WAIT1、FIN_WAIT2、TIME_WAIT、CLOSED、CLOSE_WAIT、LAST_ACK、LISTEN、CLOSING、UNKNOWN
+			Netfilter的状态：NEW,ESTABLISHED,RELATED,INVALID
 		9、AH及ESP协议的SPI值匹配（模块名称ipt_ah.ko及xt_esp.ko）
+			IPSec的加密通信中包含了两个协议，分别是AH（认证头）及ESP（封装安全负载），其中AH负责进行数据包的“完整性验证”，ESP负责进行数据包的“加密”操作
 			iptables -A FORWARD -p ah -m ah --ahspi 300 -j ACCEPT
 			iptables -A FORWARD -p esp -m esp --espspi 200 -j ACCEPT
 		10、pkttype匹配（模块名称xt_pkttype.ko）
@@ -313,7 +321,7 @@
 					#限制使用者以HTTP协议下载20M以上的数据
 					iptables -A FORWARD -p tcp -d $WEB_SERVER --dport 80 -m connbytes --connbytes-dir reply --connbytes-mode bytes --connbytes 20971520: -j DROP
 				参数说明：
-					--connbytes-dir 
+					--connbytes-dir
 						original：来源方向
 						reply：应答方向
 						both：双向
@@ -338,6 +346,7 @@
 					--timestart--->14:00
 					--timestop
 					--monthdays--->1,9,19,29
+					--weekdays
 		20、使用connmark模块来匹配mark值（模块名称xt_connmark.ko）
 				功能描述：
 					MARK处理方法所设置的mark值的有效范围仅局限于一个数据包。因此，若要对连接单一方向的所有数据包设定mark值，我们必须单独为每个数据包来设置mark值；要为连接上双向的所有数据包设置mark值，就必须借助CONNMARK的功能才有办法实现
@@ -367,13 +376,16 @@
 				--ctdir
 					--ctdir ORIGINAL
 					--ctdir REPLY
+					若没有设置这个参数，默认会匹配双向的所有数据包
 				用法举例：
 					iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 					iptables -A INPUT -m conntrack --ctproto tcp --ctorigsrc 192.168.1.0/24 --ctorigdstport 21 --ctstate NEW -j ACCEPT
 					iptables -A INPUT -p tcp --dport 21 -j DROP
 			22、使用statistic模块进行比率匹配（模块名称xt_statistic.ko）
 				功能描述：在必要的时候以随机或者规律的方式丢弃部分数据包
-				用法举例：iptables -A INPUT -p icmp -m statistic --mode random --probability 0.5 -j DROP
+				用法举例：
+					iptables -A INPUT -p icmp -m statistic --mode random --probability 0.5 -j DROP #随机丢弃50%送到本机的ICMP包
+					iptables -A INPUT -p imcp -m statistic --mode nth --every 10 --packet 1 -j DROP #以规律的方式在每10个ICMP包中丢弃1个IMCP包
 				命令参数：
 				--mode
 					random--->以随机方式丢弃数据包
@@ -383,8 +395,8 @@
 				--packet--->此参数需要在nth模式与--every参数结合使用，例如--every 10 --packet 5,因为statistic会在我们下达完iptables命令之后马上执行计数操作，而--packet 5则指在忽略前5个数据之后才开始计数
 			23、使用hashlimit模块进行重复率匹配
 				功能描述：限制特定行为的重复率
-				用法举例：iptables -A INPUT -p icmp -m hashlimit --hashlimit-name ICMP --hashlimit-burst 5 --hashlimit-upto 6/minute --hashlimit-mode srcip --hashlimit-htable-size 8192 \
-						--hashlimit-htable-expire 60000 --hashlimit-htable-gcinterval 5000 -j ACCEPT
+				用法举例：
+					iptables -A INPUT -p icmp -m hashlimit --hashlimit-name ICMP --hashlimit-burst 5 --hashlimit-upto 6/minute --hashlimit-mode srcip --hashlimit-htable-size 8192 --hashlimit-htable-expire 60000 --hashlimit-htable-gcinterval 5000 -j ACCEPT
 				命令参数：
 					--hashlimit-upto--->在单位时间内符合条件的数据包数量超过几个以上，其单位可为N/second,N/minute,N/hour,N/day
 					--hashlimit-above--->在单位时间内符合条件的数据包数量低于几个以下，其单位可为N/second,N/minute,N/hour,N/day
@@ -592,6 +604,26 @@
 	3、构建透明防火墙
 		使用Linux构建网桥
 			yum install bridge-utils
+
+        #!/bin/bash
+        echo 1 > /proc/sys/net/ipv4/ip_forward
+        brctl addbr br0
+        brctl addif br0 eth0
+        brctl addif br0 eth1
+        ifconfig br0 192.168.0.253 netmask 255.255.255.0 update
+        ip route add default via 192.168.0.254
+    4、Linux网桥的管理
+        查看系统上的网桥接口
+            #brctl show
+        启用接口的STP
+            #brctl stp br0 on
+    5、Netfilter在Layer3及Layer2的工作逻辑
+        早期kernel2.4版本中是没有这个功能的，需要手工打补丁
+        #grep -i 'config_netfilter_advanced=y' /boot/config-Kernel_Version
+        在Red hat系统中，这项功能是默认启用的
+        不管在第2层还是第3层内部都有一个Filter表的FORWARD链，但这两个链（两块内存空间）其实是同一个。
+            #iptables -t filter -A FORWARD -p icmp -j DROP
+            这条Netfilter的规则将会同时作用于第2层及第3层的环境中，
 }
 
 
