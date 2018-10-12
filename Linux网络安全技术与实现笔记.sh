@@ -570,26 +570,26 @@
 			OUTPUT：用来处理本机对外建立的连接
 
 	4.4、简单及复杂通信协议的处理
-			（1）简单的通信协议：如果客户端访问服务器时只使用“一条连接”的协议，就称为简单通信协议
-				HTTP,SSH,TELNET,SMTP,POP3,IMAP,HTTPS等
-					iptables -A FORWARD -i eth0 -o eth1 -p tcp -d $MAIL --dport 25 -j ACCEPT
-			（2）复杂的通信协议：就是客户端和服务器端之间，需要多条连接才能完成应用的协议
-				FTP,PPTP,H.323,SIP等
-				举例：FTP的通信协议
-					被动模式
-					主动模式
-						nf_conntrack_ftp.ko
-						nf_nat_ftp.ko
-						当kernel<2.6.10时，nf_nat_ftp模块名为ip_nat_ftp，ip_nat_ftp允许带Ports参数，如“modprobe ip_nat_ftp ports=21,2121”
-						当kernel>2.6.10时，ip_nat_ftp已经修改为nf_nat_ftp
-							modprobe nf_conntrack_ftp ports=21,2121
-							modprobe nf_nat_ftp
+		（1）简单的通信协议：如果客户端访问服务器时只使用“一条连接”的协议，就称为简单通信协议
+			HTTP,SSH,TELNET,SMTP,POP3,IMAP,HTTPS等
+				iptables -A FORWARD -i eth0 -o eth1 -p tcp -d $MAIL --dport 25 -j ACCEPT
+		（2）复杂的通信协议：就是客户端和服务器端之间，需要多条连接才能完成应用的协议
+			FTP,PPTP,H.323,SIP等
+			举例：FTP的通信协议
+				被动模式
+				主动模式
+					nf_conntrack_ftp.ko
+					nf_nat_ftp.ko
+					当kernel<2.6.10时，nf_nat_ftp模块名为ip_nat_ftp，ip_nat_ftp允许带Ports参数，如“modprobe ip_nat_ftp ports=21,2121”
+					当kernel>2.6.10时，ip_nat_ftp已经修改为nf_nat_ftp
+						modprobe nf_conntrack_ftp ports=21,2121
+						modprobe nf_nat_ftp
 
-			（3）ICMP包处理原则：ICMP的用途是传输控制信号或传输某种信息。
-				1、放行所有因特网送来的ESTABLISHED及RELATED状态的ICMP数据包
-				2、丢弃所有由因特网送来的其他状态的ICMP数据包
+		（3）ICMP包处理原则：ICMP的用途是传输控制信号或传输某种信息。
+			1、放行所有因特网送来的ESTABLISHED及RELATED状态的ICMP数据包
+			2、丢弃所有由因特网送来的其他状态的ICMP数据包
 
-            （4）在DMZ上使用NAT将面临的问题及解决方案
+        （4）在DMZ上使用NAT将面临的问题及解决方案
 
 	4.5、常见的网络攻击手段及防御方法
 		（1）portscan的攻击
@@ -612,17 +612,17 @@
         （2）密码攻击
         （3）DDOS攻击
         		Syn Flooding攻击
-        				TCP三次握手的致命危险
+        			TCP三次握手的致命危险
         					其实问题就发生在三次握手的第三个步骤，我们知道在第二个步骤中，服务器端会把连接信息记录在TCP队列中，而这一条信息会一直存放在TCP队列中，直到服务器端收到客户端的确认数据包之后，才会从队列中清除掉。但问题来了，如果客户端故意不回送确认包给服务器端，服务器端在经过一段时间后，会重新再发送一次第二个步骤的数据包给客户端，如果经过一段时间之后仍然无法得到客户端的应答，服务器端依然会再次重复第二个步骤中的数据包给客户端，而这样的重试将会持续5次。如果最后还是无法得到客户端的应答，服务器端就会从TCP队列中清楚该条连接的缓存信息。这5次的重试时间将会长达3分15秒之久。
         					如果以上情况在网络正常的网络环境中偶尔发生几次，倒也不至于对系统造成什么影响，万一客户端不断地对服务器端发送大量的SYN数据包（三次握手的第一个包），却又故意不回送确认包（三次握手的第三个数据包）给服务器端，服务端的TCP队列很可能被这些无法正常建立连接的信息给占满，因而导致其他正常需要访问的服务的链接无法被排入TCP队列，当然TCP连接也就无法正常建立起来，如此达到SYN flooding攻击的目的。
-                        完全阻止SYN攻击是不可能做到的，下面有几种降低伤害程度的方法
-            				单一主机的防御：
-            					1、调整系统内核中关于TCP连接的参数
-            					2、net.ipv4.tcp_synack_retries=3
-            					3、net.ipv4.tcp_max_syn_backlog=2048
-            					4、启动tcp_syncookies机制来对抗syn flooding攻击的目的。
+                    完全阻止SYN攻击是不可能做到的，下面有几种降低伤害程度的方法
+            			单一主机的防御：
+            				1、调整系统内核中关于TCP连接的参数
+            				2、net.ipv4.tcp_synack_retries=3
+            				3、net.ipv4.tcp_max_syn_backlog=2048
+            				4、启动tcp_syncookies机制来对抗syn flooding攻击的目的。
             						net.ipv4.tcp_syncookies=1
-        				网关上的防御
+						网关上的防御
         					1、缩短后端服务器端上TCP队列被占用的时间
         					2、使用Syn网关
         					3、使用反向代理机制
